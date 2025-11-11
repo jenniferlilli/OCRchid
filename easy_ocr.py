@@ -537,7 +537,7 @@ def extract_digits(cell_img, file_name, model):
     return final, good_vote
 
 
-    
+
 def extract_text_from_cells(image, file_name, model):
     extracted = []
     item_numbers = []
@@ -552,6 +552,8 @@ def extract_text_from_cells(image, file_name, model):
     cropped_cells, badge_id, key = find_main_rectangles(image, file_name)
     if cropped_cells is not None:
         for i, cell_img in enumerate(cropped_cells):
+            if i >= len(CATEGORY_IDS):
+                continue
             current, good_vote = extract_digits(cell_img, file_name, model)
             cat_id = CATEGORY_IDS[i]
             item_numbers.append(current)
@@ -566,7 +568,6 @@ def extract_text_from_cells(image, file_name, model):
                 })
             else:
                 vote_key = upload_vote_to_s3(cell_img, file_name, cat_id)
-                print(f"Invalid vote cell {current} and {cat_id}, uploading to S3: {current}")
                 extracted.append({
                     'Category ID': cat_id,
                     'Item Number': current,
@@ -575,6 +576,7 @@ def extract_text_from_cells(image, file_name, model):
                 })
 
     return extracted, badge_id, key
+
 
 
 def process_image(image_bytes, file_name, model):
