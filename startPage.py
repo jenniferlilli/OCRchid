@@ -415,6 +415,7 @@ def review_dashboard():
             )
         votes_data.append({
             'vote_id': vote.id,
+            'ballot_id': ballot.id,
             'category': vote.category_id,
             'current_vote': vote.vote,
             'badge_id': ballot.badge_id, 
@@ -429,6 +430,25 @@ def review_dashboard():
 
     db_session.close()
     return render_template('templates/a_review_db.html', badges=badges_data, votes=votes_data)
+
+@app.route('/download_ballot/<int:ballot_id>')
+def download_ballot(ballot_id):
+    db = get_db_session()
+    ballot = db.query(Ballot).filter_by(id=ballot_id).first()
+    db.close()
+
+    if not ballot:
+        return "Ballot not found", 404
+
+    s3_key = ballot.name  # the original filename stored in S3
+
+    file_obj = s3.get_object(Bucket=bucket_name, Key=s3_key)
+
+    return send_file(
+        BytesIO(file_obj['Body'].read()),
+        as_attachment=True,
+        download_name=s3_key
+    )
 
 @app.route('/fix_vote', methods=['POST'])
 def fix_vote():

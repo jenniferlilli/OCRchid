@@ -323,7 +323,20 @@
             {% for badge in badges %}
               <tr>
                 <td>{{ badge.name }}</td>
-                <td>{% if badge.badge_id %}{{ badge.badge_id }}{% else %}<span style="color: red;">(empty)</span>{% endif %}</td>
+
+                <td>
+                    {% if badge.s3_url %}
+                        <img src="{{ badge.s3_url }}" class="preview" alt="Ballot image">
+
+                    {% elif badge.badge_id == "" %}
+                        <a href="{{ url_for('download_ballot', ballot_id=badge.id) }}" style="color:red; text-decoration:underline;">
+                          ERROR IN READING — click to download full file
+                        </a>
+
+                    {% else %}
+                        No image
+                    {% endif %}
+                </td>
                 <td>{% if badge.s3_url %}<img src="{{ badge.s3_url }}" class="preview" alt="Ballot image">{% else %}No image{% endif %}</td>
                 <td>
                   <div class="action-group">
@@ -369,7 +382,18 @@
                 <td>{{ vote.name }}</td>
                 <td>{{ vote.category }}</td>
                 <td style="color:red">{{ vote.current_vote }}</td>
-                <td>{% if vote.s3_url %}<img src="{{ vote.s3_url }}" class="preview" alt="Vote image">{% else %}No image{% endif %}</td>
+                <td>
+                  {% if vote.s3_url %}
+                      <img src="{{ vote.s3_url }}" class="preview" alt="Vote image">
+
+                  {% elif vote.current_vote == "" or vote.s3_url is none %}
+                      <a href="{{ url_for('download_ballot', ballot_id=vote.ballot_id) }}" style="color:red; text-decoration:underline;">
+                          COULD NOT UPLOAD — click to download full file
+                      </a>
+                  {% else %}
+                      No image
+                  {% endif %}
+                </td>
                 <td>
                   <div class="action-group">
                     <form action="{{ url_for('fix_vote') }}" method="POST" autocomplete="off">
