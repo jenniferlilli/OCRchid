@@ -167,10 +167,22 @@ def fix_column_text(text):
     fixed = ''.join(num_to_letter.get(ch, ch) for ch in text)
     return fixed
 
+def google_vision_ocr(image_bytes):
+    image = vision.Image(content=image_bytes)
+    response = client.document_text_detection(image=image)
+    if response.error.message:
+        print("Vision error:", response.error.message)
+        return ""
+    if not response.text_annotations:
+        return ""
+    raw_text = response.text_annotations[0].description.strip()
+    cleaned = re.sub(r"[^0-9]", "", raw_text)
+
+    return cleaned
+    
 def extract_categories_items(analyze_response, blocks, file_name, image_bytes):
     s3 = boto3.client("s3")
     s3_bucket = 'techbloom-ballots'
-    key = ""
     extracted = []
     for block in analyze_response['Blocks']:
         if block['BlockType'] == 'TABLE':
@@ -253,16 +265,25 @@ def extract_categories_items(analyze_response, blocks, file_name, image_bytes):
                             buffer = io.BytesIO()
                             cropped.save(buffer, format="PNG")
                             buffer.seek(0)
+                            cropped_bytes = buffer.getvalue()
                             s3.upload_fileobj(buffer, s3_bucket, s3_key)
-
-                            print(f"Uploaded combined last 3 columns for row {row_num} to s3://{s3_bucket}/{s3_key}")
-                            key = s3_key
-                            extracted.append({
-                                'Category ID': row[-4],
-                                'Item Number': item_number,
-                                'Status': 'unreadable',
-                                'Key': key
-                            })
+                            vision_digits = google_vision_ocr(cropped_bytes)
+                            if len(vision_digits) == 3:
+                                extracted.append({
+                                    'Category ID': row[-4],
+                                    'Item Number': vision_digits,
+                                    'Status': 'readable',
+                                    'Key': ""
+                                })
+                            else:
+                                print(f"Uploaded combined last 3 columns for row {row_num} to s3://{s3_bucket}/{s3_key}")
+                                row_key = s3_key
+                                extracted.append({
+                                    'Category ID': row[-4],
+                                    'Item Number': item_number,
+                                    'Status': 'unreadable',
+                                    'Key': row_key
+                                })
                         else:
                             print(f"Could not locate last 3 Textract cells for row {row_num}")
                             extracted.append({
