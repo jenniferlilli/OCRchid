@@ -186,7 +186,7 @@ def extract_categories_items(analyze_response, blocks, file_name, image_bytes):
                             table.append(current_row)
                             current_row = []
                             last_row = cell['RowIndex']
-                        current_row.append(get_cell_text(cell))
+                        current_row.append(get_cell_text(cell, blocks))
                     table.append(current_row)
             if table and all((len(row) == 0 or not row[0].strip()) for row in table):
                 for row in table:
