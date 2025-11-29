@@ -50,6 +50,16 @@
     .back-arrow:hover {
       background-color: #ffe6eb;
     }
+    .open-window-link {
+      color: #EAA5B0;
+      text-decoration: underline;
+      cursor: pointer;
+      font-weight: bold;
+    }
+
+    .open-window-link:hover {
+      color: #cf8793;
+    }
 
     .back-arrow svg {
       stroke: #fdbfc9;
@@ -314,7 +324,6 @@
           <thead>
             <tr>
               <th>Ballot Name</th>
-              <th>Badge ID</th>
               <th>Image</th>
               <th>Actions</th>
             </tr>
@@ -323,21 +332,12 @@
             {% for badge in badges %}
               <tr>
                 <td>{{ badge.name }}</td>
-
                 <td>
-                    {% if badge.s3_url %}
-                        <img src="{{ badge.s3_url }}" class="preview" alt="Ballot image">
-
-                    {% elif badge.badge_id == "" %}
-                        <a href="{{ url_for('download_ballot', ballot_id=badge.id) }}" style="color:red; text-decoration:underline;">
-                          ERROR IN READING — click to download full file
-                        </a>
-
-                    {% else %}
-                        No image
-                    {% endif %}
+                  <span class="open-window-link"
+                        onclick="openBallotWindow('{{ badge.s3_url }}')">
+                      Click here to open ballot
+                  </span>
                 </td>
-                <td>{% if badge.s3_url %}<img src="{{ badge.s3_url }}" class="preview" alt="Ballot image">{% else %}No image{% endif %}</td>
                 <td>
                   <div class="action-group">
                     <form action="{{ url_for('fix_badge') }}" method="POST" autocomplete="off">
@@ -440,5 +440,109 @@
       }
     }, 3000);
   </script>
+  <script>
+    function openBallotWindow(imgUrl) {
+    if (!imgUrl) {
+        alert("No ballot image available.");
+        return;
+    }
+
+    const win = document.createElement("div");
+    win.style.position = "fixed";
+    win.style.top = "50%";
+    win.style.left = "50%";
+    win.style.transform = "translate(-50%, -50%)";
+
+    /* Fully responsive — no px */
+    win.style.width = "clamp(40vw, 70vw, 90vw)";
+    win.style.height = "clamp(40vh, 80vh, 90vh)";
+
+    win.style.background = "rgba(255, 241, 245, 0.95)";
+    win.style.border = "0.3vh solid #F5C4D1";
+    win.style.borderRadius = "2vh";
+    win.style.boxShadow = "0 0 4vh rgba(255, 182, 193, 0.5)";
+    win.style.backdropFilter = "blur(6px)";
+    win.style.zIndex = "999999";
+    win.style.resize = "both";
+    win.style.overflow = "auto";
+    win.style.animation = "popupFade 0.25s ease-out";
+
+    const style = document.createElement("style");
+    style.innerHTML = `
+      @keyframes popupFade {
+        from { opacity: 0; transform: scale(0.9); }
+        to { opacity: 1; transform: scale(1); }
+      }
+    `;
+    document.head.appendChild(style);
+
+    const header = document.createElement("div");
+    header.style.background = "#EAA5B0";
+    header.style.color = "white";
+    header.style.padding = "1vh 2vw";
+    header.style.cursor = "move";
+    header.style.display = "flex";
+    header.style.justifyContent = "space-between";
+    header.style.alignItems = "center";
+    header.style.fontWeight = "600";
+    header.style.borderTopLeftRadius = "2vh";
+    header.style.borderTopRightRadius = "2vh";
+    header.style.boxShadow = "0 0.4vh 1vh rgba(0,0,0,0.1)";
+
+    header.innerHTML = `
+        <span>Ballot Viewer</span>
+        <button style="
+            background:white;
+            color:#EAA5B0;
+            border:none;
+            padding:1vh 2vw;
+            border-radius:1.5vh;
+            cursor:pointer;
+            font-weight:bold;
+            box-shadow: 0 0 2vh rgba(255, 182, 193, 0.5);
+        ">X</button>
+    `;
+
+    header.querySelector("button").onclick = () => win.remove();
+
+    const img = document.createElement("img");
+    img.src = imgUrl;
+    img.style.width = "100%";
+    img.style.height = "auto";
+    img.style.borderBottomLeftRadius = "2vh";
+    img.style.borderBottomRightRadius = "2vh";
+
+    win.appendChild(header);
+    win.appendChild(img);
+    document.body.appendChild(win);
+
+    /* Dragging */
+    let dragging = false, offsetX = 0, offsetY = 0;
+
+    header.addEventListener("mousedown", (e) => {
+        dragging = true;
+        offsetX = e.clientX - win.offsetLeft;
+        offsetY = e.clientY - win.offsetTop;
+    });
+
+    window.addEventListener("mousemove", (e) => {
+        if (dragging) {
+            let newX = e.clientX - offsetX;
+            let newY = e.clientY - offsetY;
+
+            // Keep inside screen
+            newX = Math.max(0, Math.min(window.innerWidth - win.offsetWidth, newX));
+            newY = Math.max(0, Math.min(window.innerHeight - win.offsetHeight, newY));
+
+            win.style.left = newX + "px";
+            win.style.top  = newY + "px";
+            win.style.transform = ""; // disable center transform while dragging
+        }
+    });
+
+    window.addEventListener("mouseup", () => dragging = false);
+    }
+  </script>
+
 </body>
 </html>

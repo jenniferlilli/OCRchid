@@ -250,7 +250,6 @@ def fix_column_text(text):
 
 def extract_categories_items(analyze_response, blocks, file_name, image_bytes, model):
     extracted = []
-    model = get_model()
     for block in analyze_response['Blocks']:
         if block['BlockType'] == 'TABLE':
             table = []
