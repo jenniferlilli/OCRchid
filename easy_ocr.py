@@ -353,8 +353,9 @@ def extract_categories_items(analyze_response, blocks, file_name, image_bytes, m
                                                 combined_digits.append("?")
                                             else:
                                                 combined_digits.append(str(pred.item()))
-                            print(f"[Item] " + column_category + f" Item number: {combined_digits}")
-                            if "?" in combined_digits or len(combined_digits) != 3:
+                            item_number_str = ''.join(combined_digits)
+                            print(f"[Item] " + column_category + f" Item number: {item_number_str}")
+                            if "?" in item_number_str or len(item_number_str) != 3:
                                 left = int(combined_box['Left'] * img_w)
                                 top = int(combined_box['Top'] * img_h)
                                 right = int((combined_box['Left'] + combined_box['Width']) * img_w)
@@ -370,14 +371,14 @@ def extract_categories_items(analyze_response, blocks, file_name, image_bytes, m
                                     f"[S3] Uploaded combined last 3 columns for row {column_category} to s3://{s3_bucket}/{s3_key}")
                                 extracted.append({
                                     'Category ID': row[-4],
-                                    'Item Number': combined_digits,
+                                    'Item Number': item_number_str,
                                     'Status': 'unreadable',
                                     'Key': s3_key
                                 })
                             else:
                                 extracted.append({
                                     'Category ID': row[-4],
-                                    'Item Number': combined_digits,
+                                    'Item Number': item_number_str,
                                     'Status': 'readable',
                                     'Key': ""
                                 })
