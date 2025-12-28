@@ -297,6 +297,7 @@ def get_top3_votes_by_category(session_id):
 
 SCOPES = ['https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive']
 category_to_name = {"A":"Freshwater Rods","B":"Saltwater Rods","C":"Rod & Reel Combo","D":"Freshwater Reels","E":"Saltwater Reels","G":"Freshwater Soft Lures","H":"Saltwater Soft Lures","I":"Freshwater Hard Lures","J":"Saltwater Hard Lures","F":"Fly Fishing Rods","FA":"Fly Fishing Reels","FB":"Fly Fishing Rod & Reel Combo","FC":"Fly Fishing Waders & Wading Boots","FD":"Fly Lines, Leaders, Tippet & Line Accessories","FE":"Fly Fishing Technical & General Apparel","FF":"Fly Tying Vise, Tool & Material","FG":"Fly Fishing Backpacks, Bag & Luggage","FH":"Fly Fishing Tool & Accessories","K":"Fishing Line","KA":"Terminal Tackle","KB":"Tackle Management","KC":"Kids’ Tackle","L":"Fishing Accessories","M":"Cutlery, Hand Pliers or Tools","N":"Soft and Hard Coolers","O":"Custom Tackle & Components","P":"Cold Weather Technical Apparel for Men","PA":"Cold Weather Technical Apparel for Women","Q":"Warm Weather Technical Apparel for Men","QA":"Warm Weather Technical Apparel for Women","R":"Lifestyle Apparel for Men","RA":"Lifestyle Apparel for Women","S":"Footwear","T":"Eyewear","U":"Novelties & Wellness","V":"Boats & Watercraft","W":"Motorized Boating Accessories","WA":"Non Motorized Boating Accessories","X":"Ice Fishing","Y":"Electronics","YA":"Energy"}
+#2026 category_to_name = {"AA":"Freshwater Rod","AB":"Saltwater Rod","AC":"Rod and Reel Combo","BA":"Freshwater Reel","BB":"Saltwater Reel","CA":"Freshwater Soft Lure","CB":"Saltwater Soft Lure","CC":"Freshwater Hard Lure","CD":"Saltwater Hard Lures","CE":"Wired and Skirted Lure","FA":"Fly Fishing Accessory","FB":"Fly Fishing Technical Apparel","FC":"Fly Tying Tools and Materials","FD":"Fly Fishing Rod","FE":"Fly Fishing Reel","GA":"Braided Fishing Line","GB":"Non-Braided Fishing Line","HA":"Terminal Tackle","JB":"Tackle Management","JC":"Kids Tackle","KC":"Fishing Accessory","LD":"Cutlery, Hand Pliers or Tool","ME":"Cooler","NF":"Custom Tackle and Component","PA":"Men’s Technical Apparel","PB":"Women’s Technical Apparel","PC":"Extreme Weather Technical Apparel","PD":"Men's Lifestyle Apparel","PE":"Women’s Lifestyle Apparel","QA":"Footwear","RB":"Eyewear","SC":"Novelties and Wellness","TD":"Boats and Watercraft","UE":"Motorized Boating Accessory","VF":"Non-motorized Boating Accessory","WG":"Ice Fishing","XH":"Electronics","YJ":"Energy","ZK":"First Time Exhibitor Product"}
 
 def get_gsheet_client():
     service_json = os.environ["GOOGLE_SERVICE_ACCOUNT_JSON"]
@@ -326,14 +327,15 @@ def export_gsheet():
             spreadsheet = None
     else:
         spreadsheet = None
-
+    GSHEET_FOLDER_ID = "1kIMynxEvEY8Yi1BJvGDITllXGZib1aTD"
     if spreadsheet is None:
         spreadsheet_name = f"Top3Votes_Session_{session_id}"
-        spreadsheet = gc.create(spreadsheet_name)
-        spreadsheet.share(None, perm_type='anyone', role='writer')
+        spreadsheet = gc.create(spreadsheet_name, folder_id=GSHEET_FOLDER_ID)
+        spreadsheet.share("YOUR_EMAIL@gmail.com", perm_type="user", role="writer")  # optional
         worksheet = spreadsheet.sheet1
         worksheet.update_title("Top 3 Results")
         session['spreadsheet_id'] = spreadsheet.id
+
 
     header = [
         "", "Catagory ID Field", "Alpha",
