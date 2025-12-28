@@ -308,6 +308,9 @@ def get_gsheet_client():
 
 @app.route('/export_gsheet')
 def export_gsheet():
+    creds_info = creds.service_account_email
+    print("USING GOOGLE ACCOUNT:", creds_info)
+
     session_id = session.get("session_id")
     if not session_id:
         flash('Please log in or create a session first.')
