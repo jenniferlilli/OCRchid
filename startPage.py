@@ -327,10 +327,9 @@ def export_gsheet():
             spreadsheet = None
     else:
         spreadsheet = None
-    GSHEET_FOLDER_ID = "1kIMynxEvEY8Yi1BJvGDITllXGZib1aTD"
     if spreadsheet is None:
         spreadsheet_name = f"Top3Votes_Session_{session_id}"
-        spreadsheet = gc.create(spreadsheet_name, folder_id=GSHEET_FOLDER_ID)
+        spreadsheet = gc.create(spreadsheet_name)
         spreadsheet.share("YOUR_EMAIL@gmail.com", perm_type="user", role="writer")  # optional
         worksheet = spreadsheet.sheet1
         worksheet.update_title("Top 3 Results")
