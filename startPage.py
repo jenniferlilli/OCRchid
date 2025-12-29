@@ -303,14 +303,15 @@ def get_gsheet_client():
     service_json = os.environ["GOOGLE_SERVICE_ACCOUNT_JSON"]
     info = json.loads(service_json)
     creds = Credentials.from_service_account_info(info, scopes=SCOPES)
-    return gspread.authorize(creds)
+    client = gspread.authorize(creds)
+    return client, creds
 
 
 @app.route('/export_gsheet')
 def export_gsheet():
-    gc = get_gsheet_client()
-    creds_info = gc.auth.service_account_email
-    print("USING GOOGLE ACCOUNT:", creds_info)
+    gc, creds = get_gsheet_client()
+
+    print("USING GOOGLE ACCOUNT:", creds.service_account_email)
 
     session_id = session.get("session_id")
     if not session_id:
@@ -318,15 +319,14 @@ def export_gsheet():
         return redirect(url_for('login'))
 
     top3_per_category = get_top3_votes_by_category(session_id)
-    
-    spreadsheet_id = session.get('spreadsheet_id')
 
+    spreadsheet_id = session.get('spreadsheet_id')
     if spreadsheet_id:
         try:
             spreadsheet = gc.open_by_key(spreadsheet_id)
             worksheet = spreadsheet.sheet1
             worksheet.clear()
-        except gspread.exceptions.GSpreadException:
+        except Exception:
             spreadsheet = None
     else:
         spreadsheet = None
@@ -334,36 +334,34 @@ def export_gsheet():
     if spreadsheet is None:
         spreadsheet_name = f"Top3Votes_Session_{session_id}"
         spreadsheet = gc.create(spreadsheet_name)
-        spreadsheet.share("YOUR_EMAIL@gmail.com", perm_type="user", role="writer")  # optional
+        spreadsheet.share(creds.service_account_email, perm_type="user", role="writer")
         worksheet = spreadsheet.sheet1
         worksheet.update_title("Top 3 Results")
         session['spreadsheet_id'] = spreadsheet.id
 
     header = [
-        "", "Catagory ID Field", "Alpha",
-        "1st Place ID", "1st Votes #",
-        "2nd Place ID", "2nd Votes #",
-        "3rd Place ID", "3rd Votes #"
+        "Category Name", "Category ID",
+        "1st Place ID", "1st Votes",
+        "2nd Place ID", "2nd Votes",
+        "3rd Place ID", "3rd Votes"
     ]
     worksheet.append_row(header)
 
     for category_id, top_votes in top3_per_category.items():
         product_name = category_to_name.get(category_id, "Unknown Category")
         row = [product_name, category_id]
-
         for i in range(3):
             if i < len(top_votes):
                 row.extend([
-                    top_votes[i]["product_number"],
-                    top_votes[i]["count"]
+                    top_votes[i].get("product_number", ""),
+                    top_votes[i].get("count", 0)
                 ])
             else:
                 row.extend(["", ""])
-
         worksheet.append_row(row)
 
     sheet_url = spreadsheet.url
-    flash(Markup(f"Google Sheets: <a href='{sheet_url}' target='_blank'>{sheet_url}</a>"))
+    flash(Markup(f"Google Sheet created/updated: <a href='{sheet_url}' target='_blank'>{sheet_url}</a>"))
     return redirect(url_for('dashboard'))
 
 
