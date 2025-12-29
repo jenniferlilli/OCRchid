@@ -308,7 +308,8 @@ def get_gsheet_client():
 
 @app.route('/export_gsheet')
 def export_gsheet():
-    creds_info = creds.service_account_email
+    gc = get_gsheet_client()
+    creds_info = gc.auth.service_account_email
     print("USING GOOGLE ACCOUNT:", creds_info)
 
     session_id = session.get("session_id")
@@ -317,8 +318,7 @@ def export_gsheet():
         return redirect(url_for('login'))
 
     top3_per_category = get_top3_votes_by_category(session_id)
-    gc = get_gsheet_client()
-
+    
     spreadsheet_id = session.get('spreadsheet_id')
 
     if spreadsheet_id:
@@ -330,6 +330,7 @@ def export_gsheet():
             spreadsheet = None
     else:
         spreadsheet = None
+
     if spreadsheet is None:
         spreadsheet_name = f"Top3Votes_Session_{session_id}"
         spreadsheet = gc.create(spreadsheet_name)
@@ -337,7 +338,6 @@ def export_gsheet():
         worksheet = spreadsheet.sheet1
         worksheet.update_title("Top 3 Results")
         session['spreadsheet_id'] = spreadsheet.id
-
 
     header = [
         "", "Catagory ID Field", "Alpha",
@@ -365,6 +365,7 @@ def export_gsheet():
     sheet_url = spreadsheet.url
     flash(Markup(f"Google Sheets: <a href='{sheet_url}' target='_blank'>{sheet_url}</a>"))
     return redirect(url_for('dashboard'))
+
 
 @app.route('/review')
 def review_dashboard():
