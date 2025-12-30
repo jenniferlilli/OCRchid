@@ -335,6 +335,8 @@ def export_gsheet():
         spreadsheet_name = f"Top3Votes_Session_{session_id}"
         spreadsheet = gc.create(spreadsheet_name)
         spreadsheet.share(creds.service_account_email, perm_type="user", role="writer")
+        spreadsheet.share("npsicast@gmail.com", perm_type="user", role="writer")
+        spreadsheet.transfer_ownership("npsicast@gmail.com")
         worksheet = spreadsheet.sheet1
         worksheet.update_title("Top 3 Results")
         session['spreadsheet_id'] = spreadsheet.id
