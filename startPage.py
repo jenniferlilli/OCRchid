@@ -278,7 +278,7 @@ def get_top3_votes_by_category(session_id):
         product_name_map = {
             num: db_session.query(Product.product_name)
                         .filter_by(category_id=category, product_number=num)
-                        .first()
+                        .scalar()
             for num, _ in top_votes
         }
 
