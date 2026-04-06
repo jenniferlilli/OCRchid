@@ -191,7 +191,13 @@ def upload_files():
                 db_session.commit()
 
                 try:
+                    local_zip_path = os.path.join(os.getcwd(), 'uploads', filename)
+                    os.makedirs('uploads', exist_ok=True)
+                    with open(local_zip_path, "wb") as f:
+                        f.write(zip_bytes)
+                    print(f"[Flask] Sending task to Celery with zip_key: {zip_key}, session_id: {session_id}")
                     preprocess_zip_task.delay(zip_key, session_id)
+                    print(f"[Flask] Task sent successfully")                        
                     flash("ZIP file uploaded to S3. Processing started in background.")
                 except Exception as e:
                     flash(f'Error starting background task: {str(e)}')
@@ -236,9 +242,6 @@ def get_top3_votes_by_category(session_id):
     session_uuid = uuid.UUID(session_id)
     db_session = get_db_session()
 
-    valid_products = db_session.query(Product.category_id, Product.product_number).all()
-    valid_product_set = set((cat.upper(), num.strip()) for cat, num in valid_products)
-
     vote_records = (
         db_session.query(BallotVotes)
         .join(Ballot, BallotVotes.ballot_id == Ballot.id)
@@ -263,32 +266,19 @@ def get_top3_votes_by_category(session_id):
         product_number = vote.vote.strip()
         key = (vote.badge_id, category_id, product_number)
 
-        if key not in seen_votes and (category_id, product_number) in valid_product_set:
+        if key not in seen_votes:
             category_votes[category_id].append(product_number)
             seen_votes.add(key)
 
-    all_categories = sorted(set(cat.upper() for cat, _ in valid_products))
-
+    valid_categories = set(category_to_name.keys())
     top3_per_category = {}
-    for category in all_categories:
-        votes = category_votes.get(category, [])
+    for category, votes in category_votes.items():
+        if category not in valid_categories:
+            continue
         counts = Counter(votes)
-        top_votes = counts.most_common(3)
-
-        product_name_map = {
-            num: db_session.query(Product.product_name)
-                        .filter_by(category_id=category, product_number=num)
-                        .scalar()
-            for num, _ in top_votes
-        }
-
         top3_per_category[category] = [
-            {
-                "product_number": num,
-                "product_name": product_name_map.get(num, "Unknown"),
-                "count": count
-            }
-            for num, count in top_votes
+            {"product_number": num, "product_name": num, "count": count}
+            for num, count in counts.most_common(3)
         ]
 
     db_session.close()

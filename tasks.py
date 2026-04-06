@@ -36,8 +36,13 @@ def preprocess_zip_task(self, zip_key, session_id):
     try:
         session_uuid = uuid.UUID(str(session_id))
         print(f"[Celery] Downloading ZIP from S3: {zip_key}")
-        s3_object = s3_client.get_object(Bucket=bucket_name, Key=zip_key)
-        zip_bytes = s3_object['Body'].read()
+        try:
+            s3_object = s3_client.get_object(Bucket=bucket_name, Key=zip_key)
+            zip_bytes = s3_object['Body'].read()
+            print(f"[Celery] Successfully downloaded ZIP, size: {len(zip_bytes)}")
+        except Exception as s3_error:
+            print(f"[Celery] S3 download failed: {s3_error}")
+            raise
 
         with zipfile.ZipFile(BytesIO(zip_bytes), 'r') as archive:
             for file_info in archive.infolist():
