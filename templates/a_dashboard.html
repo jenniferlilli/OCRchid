@@ -14,8 +14,7 @@
       font-family: "Segoe UI", "Helvetica Neue", Helvetica, Arial, sans-serif;
       margin: 0;
       min-height: 100vh;
-      background-image: url('{{ url_for('static', filename='lillies.png') }}');
-      background-position: center;
+      background-image: url("{{ url_for('static', filename='lillies.png') }}");      background-position: center;
       background-attachment: fixed;
       background-size: cover;
       background-repeat: no-repeat;
@@ -281,10 +280,10 @@
     <h1>OCR Dashboard - ICAST Fishing Showcase Winners</h1>
 
     <div class="button-row">
-      <button onclick="location.href='{{ url_for('revisit_upload') }}'">Go to Upload Files</button>
-      <button onclick="location.href='{{ url_for('review_dashboard') }}'">Go to Review Dashboard</button>
-      <button onclick="location.href='{{ url_for('export_gsheet') }}'">Refresh Google Sheets</button>
-      <button onclick="location.href='{{ url_for('login') }}'">Logout</button>
+      <button data-href="{{ url_for('revisit_upload') }}">Go to Upload Files</button>
+      <button data-href="{{ url_for('review_dashboard') }}">Go to Review Dashboard</button>
+      <button data-href="{{ url_for('export_gsheet') }}">Refresh Google Sheets</button>
+      <button data-href="{{ url_for('login') }}">Logout</button>
     </div>
 
     <div id="refresh-container">
@@ -306,11 +305,11 @@
             {% for item in items %}
             <tr>
               <td class="placement-cell">
-                {% if loop.index == 1 %} 🥇 1st
-                {% elif loop.index == 2 %} 🥈 2nd
-                {% elif loop.index == 3 %} 🥉 3rd
-                {% else %} {{ loop.index }}th
+                {% if item.place == 1 %} 🥇 1st
+                {% elif item.place == 2 %} 🥈 2nd
+                {% elif item.place == 3 %} 🥉 3rd
                 {% endif %}
+                {% if item.is_tie %}<span style="font-size:0.75rem;color:#d18090;">(TIE)</span>{% endif %}
               </td>
               <td class="item-cell">
                 <span class="tooltip">
@@ -333,6 +332,9 @@
   <script>
     document.getElementById('refresh-btn').addEventListener('click', () => location.reload());
 
+    document.querySelectorAll('.button-row button').forEach(btn => {
+      btn.addEventListener('click', () => location.href = btn.dataset.href);
+    });
     const observer = new IntersectionObserver((entries) => {
       entries.forEach(entry => {
         if (entry.isIntersecting) entry.target.classList.add('visible');

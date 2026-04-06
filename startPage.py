@@ -272,14 +272,32 @@ def get_top3_votes_by_category(session_id):
 
     valid_categories = set(category_to_name.keys())
     top3_per_category = {}
-    for category, votes in category_votes.items():
+    for category, votes in sorted(category_votes.items()):
         if category not in valid_categories:
             continue
         counts = Counter(votes)
-        top3_per_category[category] = [
-            {"product_number": num, "product_name": num, "count": count}
-            for num, count in counts.most_common(3)
-        ]
+        sorted_items = sorted(counts.items(), key=lambda x: (-x[1], x[0]))
+
+        result = []
+        current_place = 1
+        i = 0
+        while i < len(sorted_items) and current_place <= 3:
+            current_count = sorted_items[i][1]
+            tied_items = []
+            while i < len(sorted_items) and sorted_items[i][1] == current_count:
+                tied_items.append(sorted_items[i])
+                i += 1
+            for num, count in tied_items:
+                result.append({
+                    "product_number": num,
+                    "product_name": num,
+                    "count": count,
+                    "place": current_place,
+                    "is_tie": len(tied_items) > 1
+                })
+            current_place += len(tied_items)
+
+        top3_per_category[category] = result
 
     db_session.close()
     return top3_per_category
