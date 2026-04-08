@@ -270,6 +270,9 @@ def get_top3_votes_by_category(session_id):
             category_votes[category_id].append(product_number)
             seen_votes.add(key)
 
+    product_records = db_session.query(Product).all()
+    product_number_to_name = {p.product_number.strip(): p.product_name for p in product_records}
+
     valid_categories = set(category_to_name.keys())
     top3_per_category = {}
     for category, votes in sorted(category_votes.items()):
@@ -290,7 +293,7 @@ def get_top3_votes_by_category(session_id):
             for num, count in tied_items:
                 result.append({
                     "product_number": num,
-                    "product_name": num,
+                    "product_name": product_number_to_name.get(num, num),
                     "count": count,
                     "place": current_place,
                     "is_tie": len(tied_items) > 1
