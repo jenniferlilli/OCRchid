@@ -309,19 +309,78 @@ def get_top3_votes_by_category(session_id):
 SCOPES = ['https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive']
 category_to_name = {"AA": "Freshwater Rod", "AB": "Saltwater Rod", "AC": "Rod & Reel Combo", "BA": "Freshwater Reel", "BB": "Saltwater Reel", "CA": "Freshwater Soft Lure", "CB": "Saltwater Soft Lure", "CC": "Freshwater Hard Lure", "CD": "Saltwater Hard Lure", "CE": "Fly Fishing Rod", "FA": "Fly Fishing Reel", "FB": "Fly Fishing Rod & Reel Combo", "FC": "Fly Fishing Waders & Wading Boots", "FD": "Fly Line, Leader, Tippet & Line Accessory", "FE": "Fly Fishing Technical & General Apparel", "GA": "Fly Tying Vise, Tool & Material", "GB": "Fly Fishing Backpack, Bag & Luggage", "HA": "Fly Fishing Tool & Accessory", "JB": "Fishing Line", "JC": "Terminal Tackle", "KB": "Tackle Management", "KC": "Kids' Tackle", "LD": "Fishing Accessory", "ME": "Cutlery, Hand Pliers or Tool", "NF": "Soft & Hard Cooler", "PA": "Custom Tackle & Component", "PB": "Cold Weather Technical Apparel for Men", "PC": "Cold Weather Technical Apparel for Women", "PD": "Warm Weather Technical Apparel for Men", "PE": "Warm Weather Technical Apparel for Women", "QA": "Lifestyle Apparel for Men", "RB": "Lifestyle Apparel for Women", "SC": "Footwear", "TD": "Eyewear", "UE": "Novelty & Wellness", "VF": "Boat & Watercraft", "WG": "Motorized Boating Accessory", "XH": "Non Motorized Boating Accessory", "YJ": "Ice Fishing", "ZK": "Electronic"}
 
-def get_gsheet_client():
-    service_json = os.environ["GOOGLE_SERVICE_ACCOUNT_JSON"]
-    service_account_info = json.loads(service_json)
-    
-    scopes = [
-        "https://www.googleapis.com/auth/spreadsheets",
-        "https://www.googleapis.com/auth/drive",
+SHARED_DRIVE_ID = "0ADGekdJQgUI4Uk9PVA"
+
+@app.route('/export_gsheet')
+def export_gsheet():
+    gc, creds = get_gsheet_client()
+
+    session_id = session.get("session_id")
+    if not session_id:
+        flash('Please log in or create a session first.')
+        return redirect(url_for('login'))
+
+    top3_per_category = get_top3_votes_by_category(session_id)
+
+    spreadsheet_id = session.get('spreadsheet_id')
+    if spreadsheet_id:
+        try:
+            spreadsheet = gc.open_by_key(spreadsheet_id)
+            worksheet = spreadsheet.sheet1
+            worksheet.clear()
+        except Exception:
+            spreadsheet = None
+    else:
+        spreadsheet = None
+
+    if spreadsheet is None:
+        spreadsheet_name = f"Top3Votes_Session_{session_id}"
+        spreadsheet = gc.create(spreadsheet_name, folder_id=SHARED_DRIVE_ID)
+        worksheet = spreadsheet.sheet1
+        worksheet.update_title("Top 3 Results")
+        session['spreadsheet_id'] = spreadsheet.id
+
+    header = [
+        "Category Name", "Category ID",
+        "1st Place ID", "1st Votes",
+        "2nd Place ID", "2nd Votes",
+        "3rd Place ID", "3rd Votes"
     ]
-    
-    from google.oauth2.service_account import Credentials
-    creds = Credentials.from_service_account_info(service_account_info, scopes=scopes)
-    gc = gspread.authorize(creds)
-    return gc, creds
+    worksheet.append_row(header)
+
+    for category_id, top_votes in top3_per_category.items():
+        product_name = category_to_name.get(category_id, "Unknown Category")
+        row = [product_name, category_id]
+        for i in range(3):
+            if i < len(top_votes):
+                row.extend([
+                    top_votes[i].get("product_number", ""),
+                    top_votes[i].get("count", 0)
+                ])
+            else:
+                row.extend(["", ""])
+        worksheet.append_row(row)
+
+    sheet_url = spreadsheet.url
+    flash(Markup(f"Google Sheet created/updated: <a href='{sheet_url}' target='_blank'>{sheet_url}</a>"))
+    return redirect(url_for('dashboard'))
+
+    for category_id, top_votes in top3_per_category.items():
+        product_name = category_to_name.get(category_id, "Unknown Category")
+        row = [product_name, category_id]
+        for i in range(3):
+            if i < len(top_votes):
+                row.extend([
+                    top_votes[i].get("product_number", ""),
+                    top_votes[i].get("count", 0)
+                ])
+            else:
+                row.extend(["", ""])
+        worksheet.append_row(row)
+
+    sheet_url = spreadsheet.url
+    flash(Markup(f"Google Sheet created/updated: <a href='{sheet_url}' target='_blank'>{sheet_url}</a>"))
+    return redirect(url_for('dashboard'))
 
 @app.route('/emergency_cleanup')
 def emergency_cleanup():
