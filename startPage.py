@@ -335,8 +335,11 @@ def export_gsheet():
         return redirect(url_for('login'))
 
     top3_per_category = get_top3_votes_by_category(session_id)
+    
+    spreadsheet_map = session.get('spreadsheet_map', {})
+    spreadsheet_id = spreadsheet_map.get(session_id)
 
-    spreadsheet_id = session.get('spreadsheet_id')
+    spreadsheet = None
     if spreadsheet_id:
         try:
             spreadsheet = gc.open_by_key(spreadsheet_id)
@@ -344,15 +347,15 @@ def export_gsheet():
             worksheet.clear()
         except Exception:
             spreadsheet = None
-    else:
-        spreadsheet = None
+            spreadsheet_map.pop(session_id, None)
 
     if spreadsheet is None:
         spreadsheet_name = f"Top3Votes_Session_{session_id}"
         spreadsheet = gc.create(spreadsheet_name, folder_id=SHARED_DRIVE_ID)
         worksheet = spreadsheet.sheet1
         worksheet.update_title("Top 3 Results")
-        session['spreadsheet_id'] = spreadsheet.id
+        spreadsheet_map[session_id] = spreadsheet.id
+        session['spreadsheet_map'] = spreadsheet_map
 
     header = [
         "Category Name", "Category ID",
@@ -398,7 +401,6 @@ def export_gsheet():
 
 @app.route('/emergency_cleanup')
 def emergency_cleanup():
-    """Delete ALL files from service account's Drive"""
     from googleapiclient.discovery import build
     gc, creds = get_gsheet_client()
     drive_service = build('drive', 'v3', credentials=creds)
@@ -508,7 +510,6 @@ def cleanup_drive():
     gc, creds = get_gsheet_client()
     drive_service = build('drive', 'v3', credentials=creds)
     
-    # List all files owned by service account
     results = drive_service.files().list(
         pageSize=100,
         fields="files(id, name, createdTime, size)"
@@ -516,8 +517,6 @@ def cleanup_drive():
     
     files = results.get('files', [])
     
-    # Delete files (BE CAREFUL - this deletes permanently)
-    # Comment out this loop if you just want to see the list first
     for file in files:
         print(f"Deleting: {file['name']} ({file['id']})")
         drive_service.files().delete(fileId=file['id']).execute()
