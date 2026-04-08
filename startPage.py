@@ -323,65 +323,69 @@ def get_gsheet_client():
     gc = gspread.authorize(creds)
     return gc, creds
 
-
-@app.route('/export_gsheet')
-def export_gsheet():
+@app.route('/emergency_cleanup')
+def emergency_cleanup():
+    """Delete ALL files from service account's Drive"""
+    from googleapiclient.discovery import build
     gc, creds = get_gsheet_client()
+    drive_service = build('drive', 'v3', credentials=creds)
+    
+    deleted_count = 0
+    errors = []
+    
+    try:
+        # List all files in batches
+        page_token = None
+        while True:
+            results = drive_service.files().list(
+                pageSize=100,
+                fields="nextPageToken, files(id, name, mimeType, createdTime)",
+                pageToken=page_token
+            ).execute()
+            
+            files = results.get('files', [])
+            
+            # Delete each file
+            for file in files:
+                try:
+                    drive_service.files().delete(fileId=file['id']).execute()
+                    deleted_count += 1
+                    print(f"✓ Deleted: {file['name']} ({file['id']})")
+                except Exception as e:
+                    errors.append(f"Failed to delete {file['name']}: {str(e)}")
+                    print(f"✗ Error deleting {file['name']}: {e}")
+            
+            page_token = results.get('nextPageToken')
+            if not page_token:
+                break
+                
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'deleted': deleted_count,
+            'errors': errors
+        }), 500
+    
+    return jsonify({
+        'success': True,
+        'message': f'Cleanup complete! Deleted {deleted_count} files.',
+        'deleted_count': deleted_count,
+        'errors': errors
+    })
 
+@app.route('/export_excel')
+def export_excel():
     session_id = session.get("session_id")
     if not session_id:
         flash('Please log in or create a session first.')
         return redirect(url_for('login'))
 
-    db_session = get_db_session()  # ← was missing
-    user_session = db_session.query(UserSession).filter_by(session_id=session_id).first()  # ← was missing
-
     top3_per_category = get_top3_votes_by_category(session_id)
 
-    spreadsheet = None
-    if user_session.spreadsheet_id:
-        try:
-            spreadsheet = gc.open_by_key(user_session.spreadsheet_id)
-            worksheet = spreadsheet.sheet1
-            worksheet.clear()
-        except Exception:
-            spreadsheet = None
-
-    if spreadsheet is None:
-        spreadsheet_name = f"Top3Votes_Session_{session_id}"
-        
-        # Create spreadsheet in service account's drive first
-        spreadsheet = gc.create(spreadsheet_name)
-        
-        # Immediately share with yourself as OWNER
-        spreadsheet.share(
-            "smcs2027.techbloom@gmail.com", 
-            perm_type="user", 
-            role="owner",  # This transfers ownership
-            transfer_ownership=True
-        )
-        
-        # Now remove service account's access (optional, to save its quota)
-        from googleapiclient.discovery import build
-        drive_service = build('drive', 'v3', credentials=creds)
-        
-        # Get service account email
-        service_email = creds.service_account_email
-        
-        # Remove service account permission
-        permissions = drive_service.permissions().list(fileId=spreadsheet.id).execute()
-        for perm in permissions.get('permissions', []):
-            if perm.get('emailAddress') == service_email:
-                drive_service.permissions().delete(
-                    fileId=spreadsheet.id,
-                    permissionId=perm['id']
-                ).execute()
-        
-        worksheet = spreadsheet.sheet1
-        worksheet.update_title("Top 3 Results")
-        
-        user_session.spreadsheet_id = spreadsheet.id
-        db_session.commit()
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Top 3 Results"
 
     header = [
         "Category Name", "Category ID",
@@ -389,7 +393,7 @@ def export_gsheet():
         "2nd Place ID", "2nd Votes",
         "3rd Place ID", "3rd Votes"
     ]
-    worksheet.append_row(header)
+    ws.append(header)
 
     for category_id, top_votes in top3_per_category.items():
         category_name = category_to_name.get(category_id, "Unknown Category")
@@ -411,12 +415,18 @@ def export_gsheet():
             else:
                 row.extend(["", ""])
 
-        worksheet.append_row(row)
+        ws.append(row)
 
-    db_session.close()  # ← was missing
-    sheet_url = spreadsheet.url
-    flash(Markup(f"Google Sheet created/updated: <a href='{sheet_url}' target='_blank'>{sheet_url}</a>"))
-    return redirect(url_for('dashboard'))
+    output = BytesIO()
+    wb.save(output)
+    output.seek(0)
+
+    return send_file(
+        output,
+        as_attachment=True,
+        download_name=f"top3_votes_{session_id[:8]}.xlsx",
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
 
 @app.route('/cleanup_service_account_drive')
 def cleanup_drive():
