@@ -38,6 +38,7 @@ class UserSession(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     session_id = Column(UUID(as_uuid=True), unique=True, nullable=False, default=uuid.uuid4)
     password = Column(String, nullable=False)
+    spreadsheet_id = Column(String, nullable=True)
 
 class OCRResult(Base):
     __tablename__ = 'ocr_results'

@@ -311,45 +311,77 @@ category_to_name = {"AA": "Freshwater Rod", "AB": "Saltwater Rod", "AC": "Rod & 
 
 def get_gsheet_client():
     service_json = os.environ["GOOGLE_SERVICE_ACCOUNT_JSON"]
-    info = json.loads(service_json)
-    creds = Credentials.from_service_account_info(info, scopes=SCOPES)
-    client = gspread.authorize(creds)
-    return client, creds
+    service_account_info = json.loads(service_json)
+    
+    scopes = [
+        "https://www.googleapis.com/auth/spreadsheets",
+        "https://www.googleapis.com/auth/drive",
+    ]
+    
+    from google.oauth2.service_account import Credentials
+    creds = Credentials.from_service_account_info(service_account_info, scopes=scopes)
+    gc = gspread.authorize(creds)
+    return gc, creds
 
 
 @app.route('/export_gsheet')
 def export_gsheet():
     gc, creds = get_gsheet_client()
 
-    print("USING GOOGLE ACCOUNT:", creds.service_account_email)
-
     session_id = session.get("session_id")
     if not session_id:
         flash('Please log in or create a session first.')
         return redirect(url_for('login'))
 
+    db_session = get_db_session()  # ← was missing
+    user_session = db_session.query(UserSession).filter_by(session_id=session_id).first()  # ← was missing
+
     top3_per_category = get_top3_votes_by_category(session_id)
 
-    spreadsheet_id = session.get('spreadsheet_id')
-    if spreadsheet_id:
+    spreadsheet = None
+    if user_session.spreadsheet_id:
         try:
-            spreadsheet = gc.open_by_key(spreadsheet_id)
+            spreadsheet = gc.open_by_key(user_session.spreadsheet_id)
             worksheet = spreadsheet.sheet1
             worksheet.clear()
         except Exception:
             spreadsheet = None
-    else:
-        spreadsheet = None
 
     if spreadsheet is None:
         spreadsheet_name = f"Top3Votes_Session_{session_id}"
+        
+        # Create spreadsheet in service account's drive first
         spreadsheet = gc.create(spreadsheet_name)
-        spreadsheet.share(creds.service_account_email, perm_type="user", role="writer")
-        spreadsheet.share("npsicast@gmail.com", perm_type="user", role="writer")
-        spreadsheet.transfer_ownership("npsicast@gmail.com")
+        
+        # Immediately share with yourself as OWNER
+        spreadsheet.share(
+            "smcs2027.techbloom@gmail.com", 
+            perm_type="user", 
+            role="owner",  # This transfers ownership
+            transfer_ownership=True
+        )
+        
+        # Now remove service account's access (optional, to save its quota)
+        from googleapiclient.discovery import build
+        drive_service = build('drive', 'v3', credentials=creds)
+        
+        # Get service account email
+        service_email = creds.service_account_email
+        
+        # Remove service account permission
+        permissions = drive_service.permissions().list(fileId=spreadsheet.id).execute()
+        for perm in permissions.get('permissions', []):
+            if perm.get('emailAddress') == service_email:
+                drive_service.permissions().delete(
+                    fileId=spreadsheet.id,
+                    permissionId=perm['id']
+                ).execute()
+        
         worksheet = spreadsheet.sheet1
         worksheet.update_title("Top 3 Results")
-        session['spreadsheet_id'] = spreadsheet.id
+        
+        user_session.spreadsheet_id = spreadsheet.id
+        db_session.commit()
 
     header = [
         "Category Name", "Category ID",
@@ -360,22 +392,57 @@ def export_gsheet():
     worksheet.append_row(header)
 
     for category_id, top_votes in top3_per_category.items():
-        product_name = category_to_name.get(category_id, "Unknown Category")
-        row = [product_name, category_id]
-        for i in range(3):
-            if i < len(top_votes):
-                row.extend([
-                    top_votes[i].get("product_number", ""),
-                    top_votes[i].get("count", 0)
-                ])
+        category_name = category_to_name.get(category_id, "Unknown Category")
+        row = [category_name, category_id]
+
+        by_place = {}
+        for item in top_votes:
+            place = item["place"]
+            if place not in by_place:
+                by_place[place] = []
+            by_place[place].append(item)
+
+        for place in [1, 2, 3]:
+            if place in by_place:
+                items = by_place[place]
+                names = ", ".join(i["product_number"] for i in items)
+                votes = items[0]["count"]
+                row.extend([names, votes])
             else:
                 row.extend(["", ""])
+
         worksheet.append_row(row)
 
+    db_session.close()  # ← was missing
     sheet_url = spreadsheet.url
     flash(Markup(f"Google Sheet created/updated: <a href='{sheet_url}' target='_blank'>{sheet_url}</a>"))
     return redirect(url_for('dashboard'))
 
+@app.route('/cleanup_service_account_drive')
+def cleanup_drive():
+    """List and optionally delete files in service account's Drive"""
+    from googleapiclient.discovery import build
+    gc, creds = get_gsheet_client()
+    drive_service = build('drive', 'v3', credentials=creds)
+    
+    # List all files owned by service account
+    results = drive_service.files().list(
+        pageSize=100,
+        fields="files(id, name, createdTime, size)"
+    ).execute()
+    
+    files = results.get('files', [])
+    
+    # Delete files (BE CAREFUL - this deletes permanently)
+    # Comment out this loop if you just want to see the list first
+    for file in files:
+        print(f"Deleting: {file['name']} ({file['id']})")
+        drive_service.files().delete(fileId=file['id']).execute()
+    
+    return jsonify({
+        'message': f'Deleted {len(files)} files',
+        'files': files
+    })
 
 @app.route('/review')
 def review_dashboard():
