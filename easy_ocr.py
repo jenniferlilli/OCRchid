@@ -286,7 +286,7 @@ def extract_categories_items(analyze_response, blocks, file_name, image_bytes, m
                     last_three_values = [row[-3].strip(), row[-2].strip(), row[-1].strip()]
                     if all(v.strip() == "" for v in last_three_values):
                         continue
-                    if all(v.isdigit() for v in last_three_values):
+                    if all(v.isdigit() and len(v) == 1 for v in last_three_values):
                         item_number = "".join(last_three_values)
                         print(f"[Item] Category" + row[-4] + f" Item number: {item_number}")
                         extracted.append({
@@ -323,7 +323,7 @@ def extract_categories_items(analyze_response, blocks, file_name, image_bytes, m
                             combined_digits = []
                             for idx, cell in enumerate(last_three_cells):
                                 text = get_cell_text(cell, blocks).strip()
-                                if text.isdigit():
+                                if text.isdigit() and len(text) == 1:
                                     combined_digits.append(text)
                                 else:
                                     left = int(cell['Geometry']['BoundingBox']['Left'] * img_w)
