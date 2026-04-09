@@ -368,29 +368,20 @@ def export_gsheet():
     for category_id, top_votes in top3_per_category.items():
         product_name = category_to_name.get(category_id, "Unknown Category")
         row = [product_name, category_id]
-        for i in range(3):
-            if i < len(top_votes):
-                row.extend([
-                    top_votes[i].get("product_number", ""),
-                    top_votes[i].get("count", 0)
-                ])
-            else:
-                row.extend(["", ""])
-        worksheet.append_row(row)
 
-    sheet_url = spreadsheet.url
-    flash(Markup(f"Google Sheet created/updated: <a href='{sheet_url}' target='_blank'>{sheet_url}</a>"))
-    return redirect(url_for('dashboard'))
+        by_place = {}
+        for item in top_votes:
+            place = item["place"]
+            if place not in by_place:
+                by_place[place] = []
+            by_place[place].append(item)
 
-    for category_id, top_votes in top3_per_category.items():
-        product_name = category_to_name.get(category_id, "Unknown Category")
-        row = [product_name, category_id]
-        for i in range(3):
-            if i < len(top_votes):
-                row.extend([
-                    top_votes[i].get("product_number", ""),
-                    top_votes[i].get("count", 0)
-                ])
+        for place in [1, 2, 3]:
+            if place in by_place:
+                items = by_place[place]
+                numbers = ", ".join(i["product_number"] for i in items)
+                votes = items[0]["count"]
+                row.extend([numbers, votes])
             else:
                 row.extend(["", ""])
         worksheet.append_row(row)
